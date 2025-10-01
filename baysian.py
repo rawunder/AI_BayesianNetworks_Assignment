@@ -1,5 +1,7 @@
+import os
 import pyagrum as gum
 import pyagrum.lib.notebook as gnb
+import pyagrum.lib.image as gumimage
 
 # Create the Bayesian Network
 bn = gum.BayesNet('Strategic Asset Allocation Network')
@@ -139,7 +141,13 @@ bn.addArc('Crypto_Perf', 'Portfolio_Out')
 
 print("Network Structure Created")
 print(f"Number of nodes: {bn.size()}")
-print(f"Number of arcs: {bn.sizeArcs()}")
+print(f"Number of arcs: {bn.sizeArcs()}")\
+
+# ===================================================================
+#                      VISUALIZE THE BAYESIAN NETWORK
+# ===================================================================
+gumimage.export(bn,"test_output.png")
+
 
 # --- Corrected CPT for Bond Performance ---
 bond_cpt = bn.cpt('Bond_Perf')
@@ -335,61 +343,3 @@ for stock_label in stock_perf.labels():
 
 print("Portfolio_Out CPT populated.")
 
-# ===================================================================
-#                      PERFORMING INFERENCE
-# ===================================================================
-
-# 1. Create an Inference Engine
-# Using the LazyPropagation engine is a good general-purpose choice.
-ie = gum.LazyPropagation(bn)
-
-# 2. Set Evidence
-# Let's define a scenario: High Inflation and High Market Volatility.
-# The evidence is set using a dictionary where keys are node names
-# and values are the observed states (as strings).
-ie.setEvidence({'Inflation_Env': 'High', 'Market_Vol': 'High'})
-
-# You can also set evidence on multiple nodes at once
-# ie.setEvidence({'GDP_Trend': 'Recession', 'Interest_Rate': 'Hiking'})
-
-# 3. Make a Query
-# We want to know the new probability distribution for 'Portfolio_Out'.
-ie.makeInference()
-posterior_portfolio = ie.posterior('Portfolio_Out')
-
-# 4. Display the Results
-print("\n" + "="*60)
-print("INFERENCE RESULTS")
-print("="*60)
-print("\nScenario (Evidence): High Inflation, High Market Volatility")
-print("\nPosterior probability of Portfolio Outcome:")
-print(posterior_portfolio)
-
-# The result is an object, you can access specific probabilities
-print(f"\nProbability of a Strong Loss: {posterior_portfolio['Strong_Loss']:.2%}")
-print(f"Probability of a Strong Gain: {posterior_portfolio['Strong_Gain']:.2%}")
-
-
-# ===================================================================
-#         ANOTHER COMMON QUERY: MOST PROBABLE EXPLANATION (MPE)
-# ===================================================================
-# MPE finds the most likely state for *all* unobserved variables.
-
-# We'll use the same evidence as before.
-# ie.setEvidence({'Inflation_Env': 'High', 'Market_Vol': 'High'}) # Already set from before
-ie.makeInference()
-mpe_scenario = ie.MPE()
-
-print("\n" + "="*60)
-print("MOST PROBABLE EXPLANATION (MPE)")
-print("="*60)
-print("\nGiven High Inflation and High Volatility, the most likely overall scenario is:")
-
-# The MPE result is a dictionary of node IDs and their state indices.
-# We need to look up the names and labels to make it readable.
-for nodeId, state_index in mpe_scenario.items():
-    nodeName = bn.variable(nodeId).name()
-    stateLabel = bn.variable(nodeId).label(state_index)
-    # We only care about the variables that weren't part of our evidence
-    if nodeName not in ['Inflation_Env', 'Market_Vol']:
-        print(f"- {nodeName}: {stateLabel}")
