@@ -1,345 +1,246 @@
-import os
 import pyagrum as gum
 import pyagrum.lib.notebook as gnb
 import pyagrum.lib.image as gumimage
 
-# Create the Bayesian Network
-bn = gum.BayesNet('Strategic Asset Allocation Network')
+# ===================================================================
+#                      1. DEFINE NETWORK STRUCTURE
+# ===================================================================
+print("Creating Influence Diagram structure...")
+# Create the Influence Diagram
+bn = gum.InfluenceDiagram()
 
-# Create the variable, add it to the network, and then get the object back to modify it.
-'''bn.add(gum.LabelizedVariable('GDP_Trend', 'GDP Trend', 4))
-gdp = bn.variable('GDP_Trend') # Get the variable object by its name
-gdp.changeLabel(0, 'Recession')
-gdp.changeLabel(1, 'Stagnant')
-gdp.changeLabel(2, 'Moderate')
-gdp.changeLabel(3, 'Strong')
-'''
 
-# 1. Create the LabelizedVariable object
+# --- CHANCE NODES ---
+# Exogenous Drivers
 gdp_var = gum.LabelizedVariable('GDP_Trend', 'GDP Trend', 4)
-
-# 2. Modify the object by changing its labels
-gdp_var.changeLabel(0, 'Recession')
-gdp_var.changeLabel(1, 'Stagnant')
-gdp_var.changeLabel(2, 'Moderate')
-gdp_var.changeLabel(3, 'Strong')
-
-# 3. Add the fully configured variable to the network
+gdp_var.changeLabel(0, 'Recession'); gdp_var.changeLabel(1, 'Stagnant'); gdp_var.changeLabel(2, 'Moderate'); gdp_var.changeLabel(3, 'Strong')
 bn.add(gdp_var)
 
-inflation = gum.LabelizedVariable('Inflation_Env', 'Inflation Environment', 3)
+inflation_var = gum.LabelizedVariable('Inflation_Env', 'Inflation Environment', 3)
+inflation_var.changeLabel(0, 'Deflationary'); inflation_var.changeLabel(1, 'Low'); inflation_var.changeLabel(2, 'High')
+bn.add(inflation_var)
 
-#inflation = bn.variable('Inflation_Env') # Get the variable object
-inflation.changeLabel(0, 'Deflationary')
-inflation.changeLabel(1, 'Low')
-inflation.changeLabel(2, 'High')
+# Endogenous Factors
+interest_rate_var = gum.LabelizedVariable('Interest_Rate', 'Interest Rate Trajectory', 3)
+interest_rate_var.changeLabel(0, 'Cutting'); interest_rate_var.changeLabel(1, 'Holding'); interest_rate_var.changeLabel(2, 'Hiking')
+bn.add(interest_rate_var)
 
-bn.add(inflation)
+volatility_var = gum.LabelizedVariable('Market_Vol', 'Market Volatility', 3)
+volatility_var.changeLabel(0, 'Low'); volatility_var.changeLabel(1, 'Normal'); volatility_var.changeLabel(2, 'High')
+bn.add(volatility_var)
 
-# Endogenous factors - Interest Rate
-interest_rate = gum.LabelizedVariable('Interest_Rate', 'Interest Rate Trajectory', 3)
+# Asset Performance Nodes
+stock_perf_var = gum.LabelizedVariable('Stock_Perf', 'Stock Performance', 5)
+stock_perf_var.changeLabel(0, 'Strong_Loss'); stock_perf_var.changeLabel(1, 'Minor_Loss'); stock_perf_var.changeLabel(2, 'Neutral'); stock_perf_var.changeLabel(3, 'Minor_Gain'); stock_perf_var.changeLabel(4, 'Strong_Gain')
+bn.add(stock_perf_var)
 
-#interest_rate = bn.variable('Interest_Rate')  # Get the variable object
-interest_rate.changeLabel(0, 'Cutting')
-interest_rate.changeLabel(1, 'Holding')
-interest_rate.changeLabel(2, 'Hiking')
+bond_perf_var = gum.LabelizedVariable('Bond_Perf', 'Bond Performance', 5)
+bond_perf_var.changeLabel(0, 'Strong_Loss'); bond_perf_var.changeLabel(1, 'Minor_Loss'); bond_perf_var.changeLabel(2, 'Neutral'); bond_perf_var.changeLabel(3, 'Minor_Gain'); bond_perf_var.changeLabel(4, 'Strong_Gain')
+bn.add(bond_perf_var)
 
-bn.add(interest_rate)
+crypto_perf_var = gum.LabelizedVariable('Crypto_Perf', 'Crypto Performance', 5)
+crypto_perf_var.changeLabel(0, 'Strong_Loss'); crypto_perf_var.changeLabel(1, 'Minor_Loss'); crypto_perf_var.changeLabel(2, 'Neutral'); crypto_perf_var.changeLabel(3, 'Minor_Gain'); crypto_perf_var.changeLabel(4, 'Strong_Gain')
+bn.add(crypto_perf_var)
 
-# Endogenous factors - Market Volatility
-volatility = gum.LabelizedVariable('Market_Vol', 'Market Volatility', 3)
+# Generalized Outcome
+portfolio_outcome_var = gum.LabelizedVariable('Portfolio_Out', 'Portfolio Outcome', 5)
+portfolio_outcome_var.changeLabel(0, 'Strong_Loss'); portfolio_outcome_var.changeLabel(1, 'Minor_Loss'); portfolio_outcome_var.changeLabel(2, 'Neutral'); portfolio_outcome_var.changeLabel(3, 'Minor_Gain'); portfolio_outcome_var.changeLabel(4, 'Strong_Gain')
+bn.add(portfolio_outcome_var)
 
-#volatility = bn.variable('Market_Vol')  # Get the variable object
-volatility.changeLabel(0, 'Low')
-volatility.changeLabel(1, 'Normal')
-volatility.changeLabel(2, 'High')
+# User Profile Node
+risk_tolerance_var = gum.LabelizedVariable('Risk_Tol', 'Investor Risk Tolerance', 3)
+risk_tolerance_var.changeLabel(0, 'Conservative'); risk_tolerance_var.changeLabel(1, 'Moderate'); risk_tolerance_var.changeLabel(2, 'Aggressive')
+bn.add(risk_tolerance_var)
 
-bn.add(volatility)
+# --- DECISION AND UTILITY NODES ---
+# Decision Node
+invest_in_var = gum.LabelizedVariable('Invest_In', 'Investment Choice', 4)
+invest_in_var.changeLabel(0, 'Stocks'); invest_in_var.changeLabel(1, 'Bonds'); invest_in_var.changeLabel(2, 'Crypto'); invest_in_var.changeLabel(3, 'Cash')
+bn.addDecisionNode(invest_in_var)
 
-# Asset performance nodes - Stock Performance
-stock_perf = gum.LabelizedVariable('Stock_Perf', 'Stock Performance', 5)
+# Utility Node
+utility_var = gum.DiscretizedVariable('Utility', 'Portfolio Utility Score')
+utility_var.addTick(-100); utility_var.addTick(100) # Define range
+bn.addUtilityNode(utility_var)
 
-#stock_perf = bn.variable('Stock_Perf')  # Get the variable object
-stock_perf.changeLabel(0, 'Strong_Loss')
-stock_perf.changeLabel(1, 'Minor_Loss')
-stock_perf.changeLabel(2, 'Neutral')
-stock_perf.changeLabel(3, 'Minor_Gain')
-stock_perf.changeLabel(4, 'Strong_Gain')
-
-bn.add(stock_perf)
-
-# Asset performance nodes - Bond Performance
-bond_perf = gum.LabelizedVariable('Bond_Perf', 'Bond Performance', 5)
-
-#bond_perf = bn.variable('Bond_Perf')  # Get the variable object
-bond_perf.changeLabel(0, 'Strong_Loss')
-bond_perf.changeLabel(1, 'Minor_Loss')
-bond_perf.changeLabel(2, 'Neutral')
-bond_perf.changeLabel(3, 'Minor_Gain')
-bond_perf.changeLabel(4, 'Strong_Gain')
-
-bn.add(bond_perf)
-
-# Asset performance nodes - Crypto Performance
-crypto_perf = gum.LabelizedVariable('Crypto_Perf', 'Crypto Performance', 5)
-
-#crypto_perf = bn.variable('Crypto_Perf')  # Get the variable object
-crypto_perf.changeLabel(0, 'Strong_Loss')
-crypto_perf.changeLabel(1, 'Minor_Loss')
-crypto_perf.changeLabel(2, 'Neutral')
-crypto_perf.changeLabel(3, 'Minor_Gain')
-crypto_perf.changeLabel(4, 'Strong_Gain')
-
-bn.add(crypto_perf)
-
-# Risk tolerance node
-risk_tolerance = gum.LabelizedVariable('Risk_Tol', 'Investor Risk Tolerance', 3)
-
-#risk_tolerance = bn.variable('Risk_Tol')  # Get the variable object
-risk_tolerance.changeLabel(0, 'Conservative')
-risk_tolerance.changeLabel(1, 'Moderate')
-risk_tolerance.changeLabel(2, 'Aggressive')
-
-bn.add(risk_tolerance)
-
-# Portfolio outcome node
-portfolio_outcome = gum.LabelizedVariable('Portfolio_Out', 'Portfolio Outcome', 5)
-
-#portfolio_outcome = bn.variable('Portfolio_Out')  # Get the variable object
-portfolio_outcome.changeLabel(0, 'Strong_Loss')
-portfolio_outcome.changeLabel(1, 'Minor_Loss')
-portfolio_outcome.changeLabel(2, 'Neutral')
-portfolio_outcome.changeLabel(3, 'Minor_Gain')
-portfolio_outcome.changeLabel(4, 'Strong_Gain')
-
-# Add arcs (causal relationships)
-bn.add(portfolio_outcome)
-
-# Inflation influences interest rates
+# --- ADD ARCS (CAUSAL RELATIONSHIPS) ---
+# Economic flow
 bn.addArc('Inflation_Env', 'Interest_Rate')
-
-# Economic factors influence stock performance
-bn.addArc('GDP_Trend', 'Stock_Perf')
+# Economic factors -> Asset Performance
+bn.addArc('GDP_Trend',     'Stock_Perf')
 bn.addArc('Inflation_Env', 'Stock_Perf')
 bn.addArc('Interest_Rate', 'Stock_Perf')
-bn.addArc('Market_Vol', 'Stock_Perf')
-
-# Factors influence bond performance
+bn.addArc('Market_Vol',    'Stock_Perf')
 bn.addArc('Inflation_Env', 'Bond_Perf')
 bn.addArc('Interest_Rate', 'Bond_Perf')
-bn.addArc('Market_Vol', 'Bond_Perf')
-
-# Factors influence crypto performance
+bn.addArc('Market_Vol',    'Bond_Perf')
 bn.addArc('Inflation_Env', 'Crypto_Perf')
 bn.addArc('Interest_Rate', 'Crypto_Perf')
-bn.addArc('Market_Vol', 'Crypto_Perf')
+bn.addArc('Market_Vol',    'Crypto_Perf')
+# Decision flow
+bn.addArc('Invest_In',     'Portfolio_Out')
+bn.addArc('Stock_Perf',    'Portfolio_Out')
+bn.addArc('Bond_Perf',     'Portfolio_Out')
+bn.addArc('Crypto_Perf',   'Portfolio_Out')
+# Utility flow
+bn.addArc('Portfolio_Out', 'Utility')
+bn.addArc('Risk_Tol',      'Utility')
 
-# Asset performances influence portfolio outcome
-bn.addArc('Stock_Perf', 'Portfolio_Out')
-bn.addArc('Bond_Perf', 'Portfolio_Out')
-bn.addArc('Crypto_Perf', 'Portfolio_Out')
-
-print("Network Structure Created")
-print(f"Number of nodes: {bn.size()}")
-print(f"Number of arcs: {bn.sizeArcs()}")\
-
+print("Structure created. Populating CPTs...")
 # ===================================================================
-#                      VISUALIZE THE BAYESIAN NETWORK
+#                      2. POPULATE ALL CPTS
 # ===================================================================
-gumimage.export(bn,"test_output.png")
 
+# --- ROOT NODE PRIORS ---
+# Based on expert forecasts for 2025-2026 from your report [cite: 220-227]
+# GDP: High probability of 'Moderate' growth [cite: 225]
+bn.cpt('GDP_Trend')[:] = [0.10, 0.20, 0.60, 0.10] # P(Recession, Stagnant, Moderate, Strong)
+# Inflation: Split between 'Low' and 'High' [cite: 226]
+bn.cpt('Inflation_Env')[:] = [0.05, 0.45, 0.50] # P(Deflationary, Low, High)
+# Market Volatility: Assume 'Normal' is most likely
+bn.cpt('Market_Vol')[:] = [0.20, 0.60, 0.20] # P(Low, Normal, High)
+# Risk Tolerance: Assume uniform distribution until user specifies
+bn.cpt('Risk_Tol')[:] = [1/3, 1/3, 1/3]
 
-# --- Corrected CPT for Bond Performance ---
-bond_cpt = bn.cpt('Bond_Perf')
-# Calculate parent combinations: Interest_Rate(3) * Inflation_Env(3) * Market_Vol(3) = 27
+# --- CONDITIONAL PROBABILITY TABLES ---
+# Interest Rate Trajectory CPT (dependent on Inflation)
+# Logically filling based on central bank reaction function 
+bn.cpt('Interest_Rate')[{'Inflation_Env': 'Deflationary'}] = [0.70, 0.25, 0.05] # Cutting, Holding, Hiking
+bn.cpt('Interest_Rate')[{'Inflation_Env': 'Low'}]          = [0.15, 0.70, 0.15]
+bn.cpt('Interest_Rate')[{'Inflation_Env': 'High'}]         = [0.05, 0.25, 0.70]
+
+# Asset Performance CPTs (using examples from your report's CPT table) [cite: 250]
+# Filling with a default, then overriding specific, important cases.
+default_dist = [0.20, 0.20, 0.20, 0.20, 0.20] # Uniform default
+# Stock Performance
+default_stock_dist = [0.15, 0.20, 0.30, 0.25, 0.10]
+num_stock_parent_combos = 108
+bn.cpt('Stock_Perf').fillWith(default_stock_dist * num_stock_parent_combos)
+bn.cpt('Stock_Perf')[{'GDP_Trend':'Strong', 'Inflation_Env':'Low', 'Interest_Rate':'Holding', 'Market_Vol':'Low'}] = [0.01, 0.04, 0.10, 0.35, 0.50]
+bn.cpt('Stock_Perf')[{'GDP_Trend':'Stagnant', 'Inflation_Env':'High', 'Interest_Rate':'Hiking', 'Market_Vol':'High'}] = [0.40, 0.30, 0.20, 0.08, 0.02]
+bn.cpt('Stock_Perf')[{'GDP_Trend':'Recession', 'Inflation_Env':'Low', 'Interest_Rate':'Cutting', 'Market_Vol':'High'}] = [0.50, 0.25, 0.15, 0.07, 0.03]
+# Bond Performance
 num_bond_parent_combos = 27
 default_bond_dist = [0.15, 0.20, 0.30, 0.25, 0.10]
-
-# FIRST, explicitly create the full list of 135 values and fill the table
-bond_cpt.fillWith(default_bond_dist * num_bond_parent_combos)
-
-# SECOND, override the specific combinations you care about
-bond_cpt[{'Interest_Rate': 'Cutting', 'Inflation_Env': 'Low', 'Market_Vol': 'Low'}] = \
-    [0.02, 0.08, 0.20, 0.50, 0.20]
-bond_cpt[{'Interest_Rate': 'Hiking', 'Inflation_Env': 'High', 'Market_Vol': 'High'}] = \
-    [0.60, 0.25, 0.10, 0.04, 0.01]
-
-# --- Corrected CPT for Stock Performance ---
-stock_cpt = bn.cpt('Stock_Perf')
-# Calculate parent combinations: GDP_Trend(4) * Inflation_Env(3) * Interest_Rate(3) * Market_Vol(3) = 108
-num_stock_parent_combos = 108
-default_stock_dist = [0.15, 0.20, 0.30, 0.25, 0.10]
-
-# FIRST, fill the entire table (108 * 5 = 540 values)
-stock_cpt.fillWith(default_stock_dist * num_stock_parent_combos)
-
-# SECOND, override specific cases
-stock_cpt[{'GDP_Trend': 'Strong', 'Inflation_Env': 'Low', 'Interest_Rate': 'Holding', 'Market_Vol': 'Low'}] = \
-    [0.01, 0.04, 0.10, 0.35, 0.50]
-stock_cpt[{'GDP_Trend': 'Recession', 'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'High'}] = \
-    [0.50, 0.30, 0.12, 0.06, 0.02]
-
-
-# --- Corrected CPT for Crypto Performance ---
-crypto_cpt = bn.cpt('Crypto_Perf')
-# Calculate parent combinations: Inflation_Env(3) * Interest_Rate(3) * Market_Vol(3) = 27
+bn.cpt('Bond_Perf').fillWith(default_bond_dist * num_bond_parent_combos)
+bn.cpt('Bond_Perf')[{'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'Normal'}] = [0.60, 0.25, 0.10, 0.05, 0.00]
+bn.cpt('Bond_Perf')[{'Inflation_Env': 'Low', 'Interest_Rate': 'Cutting', 'Market_Vol': 'High'}] = [0.01, 0.04, 0.15, 0.40, 0.40] # Flight to safety
+# Crypto Performance
 num_crypto_parent_combos = 27
 default_crypto_dist = [0.20, 0.25, 0.30, 0.15, 0.10]
+bn.cpt('Crypto_Perf').fillWith(default_crypto_dist * num_crypto_parent_combos)
+bn.cpt('Crypto_Perf')[{'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'High'}] = [0.45, 0.30, 0.15, 0.08, 0.02]
+bn.cpt('Crypto_Perf')[{'Inflation_Env': 'Low', 'Interest_Rate': 'Cutting', 'Market_Vol': 'Low'}] = [0.05, 0.10, 0.20, 0.30, 0.35]
 
-# FIRST, fill the entire table (27 * 5 = 135 values)
-crypto_cpt.fillWith(default_crypto_dist * num_crypto_parent_combos)
-
-# SECOND, override specific cases
-crypto_cpt[{'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'High'}] = \
-    [0.45, 0.30, 0.15, 0.08, 0.02]
-crypto_cpt[{'Inflation_Env': 'Low', 'Interest_Rate': 'Cutting', 'Market_Vol': 'Low'}] = \
-    [0.05, 0.10, 0.20, 0.30, 0.35]
-
-# --- Portfolio Outcome CPT ---
-# IMPORTANT: As predicted in my last message, this node will cause the next error.
-# For now, you MUST simplify the model to get it running.
-# Comment out the arcs leading to Portfolio_Out in the "Add arcs" section.
-# e.g., # bn.addArc('Stock_Perf', 'Portfolio_Out')
+# Portfolio Outcome CPT (Multiplexer Logic)
+# The outcome of the portfolio deterministically follows the chosen asset class.
 po_cpt = bn.cpt('Portfolio_Out')
-num_po_parent_combos = 125
-default_po_dist = [0.15, 0.20, 0.30, 0.25, 0.10]
+for stock_label in bn.variable('Stock_Perf').labels():
+    for bond_label in bn.variable('Bond_Perf').labels():
+        for crypto_label in bn.variable('Crypto_Perf').labels():
+            for decision_label in bn.variable('Invest_In').labels():
+                # Default for 'Cash' is always 'Neutral'
+                outcome_dist = [0.0, 0.0, 1.0, 0.0, 0.0]
+                if decision_label == 'Stocks':
+                    outcome_dist = [1.0 if l == stock_label else 0.0 for l in bn.variable('Portfolio_Out').labels()]
+                elif decision_label == 'Bonds':
+                    outcome_dist = [1.0 if l == bond_label else 0.0 for l in bn.variable('Portfolio_Out').labels()]
+                elif decision_label == 'Crypto':
+                    outcome_dist = [1.0 if l == crypto_label else 0.0 for l in bn.variable('Portfolio_Out').labels()]
+                po_cpt[{'Stock_Perf': stock_label, 'Bond_Perf': bond_label, 'Crypto_Perf': crypto_label, 'Invest_In': decision_label}] = outcome_dist
 
-po_cpt.fillWith(default_po_dist * num_po_parent_combos)
+# --- UTILITY TABLE ---
+# Based on the utility matrix from your report [cite: 280]
+utility_table = bn.utility('Utility')
+utility_matrix = {
+    'Strong_Loss': [-100, -50, -25], 'Minor_Loss':  [-50,  -20, -5],
+    'Neutral':     [5,    0,   0],   'Minor_Gain':  [20,   25,  20],
+    'Strong_Gain': [40,   60,  100]
+}
+for i, outcome_label in enumerate(bn.variable('Portfolio_Out').labels()):
+    for j, risk_label in enumerate(bn.variable('Risk_Tol').labels()):
+        utility_table[{'Portfolio_Out': outcome_label, 'Risk_Tol': risk_label}] = utility_matrix[outcome_label][j]
 
-'''# Set prior probabilities for root nodes
-# GDP Trend priors (based on expert forecasts)
-bn.cpt('GDP_Trend').fillWith([0.10, 0.15, 0.60, 0.15])  # [Recession, Stagnant, Moderate, Strong]
+print("Model is complete and ready for inference.")
+# ===================================================================
+#                      3. PERFORM DECISION INFERENCE
+# ===================================================================
 
-# Inflation Environment priors
-bn.cpt('Inflation_Env').fillWith([0.05, 0.50, 0.45])  # [Deflationary, Low, High]
+# Add information arcs to the decision node
+print("\nAdding information arcs to the decision node...")
+bn.addArc('GDP_Trend', 'Invest_In')
+bn.addArc('Inflation_Env', 'Invest_In')
+bn.addArc('Interest_Rate', 'Invest_In')
+bn.addArc('Market_Vol', 'Invest_In')
+print("Information arcs added.")
 
-# Market Volatility priors
-bn.cpt('Market_Vol').fillWith([0.30, 0.50, 0.20])  # [Low, Normal, High]
+# Create an Inference Engine
+ie = gum.ShaferShenoyLIMIDInference(bn)
 
-# Risk Tolerance priors (uniform - user will set evidence)
-bn.cpt('Risk_Tol').fillWith([0.33, 0.34, 0.33])  # [Conservative, Moderate, Aggressive]
-
-# Example CPT for Interest Rate Trajectory (conditional on Inflation)
-# Format: [Cutting, Holding, Hiking] for each inflation state
-ir_cpt = bn.cpt('Interest_Rate')
-# Deflationary
-ir_cpt[{'Inflation_Env': 'Deflationary'}] = [0.70, 0.25, 0.05]
-# Low
-ir_cpt[{'Inflation_Env': 'Low'}] = [0.30, 0.50, 0.20]
-# High
-ir_cpt[{'Inflation_Env': 'High'}] = [0.05, 0.15, 0.80]
-
-# Example CPT for Bond Performance (based on Table 1 from document)
-# Simplified version - full implementation would include all combinations
-bond_cpt = bn.cpt('Bond_Perf')
-
-# Fill remaining combinations with default values
-bond_cpt.fillWith([0.15, 0.20, 0.30, 0.25, 0.10])
-
-# Example: Cutting rates with Low inflation
-bond_cpt[{'Interest_Rate': 'Cutting', 'Inflation_Env': 'Low', 'Market_Vol': 'Low'}] = \
-    [0.02, 0.08, 0.20, 0.50, 0.20]  # [Strong Loss, Minor Loss, Neutral, Minor Gain, Strong Gain]
-
-# Example: Hiking rates with High inflation
-bond_cpt[{'Interest_Rate': 'Hiking', 'Inflation_Env': 'High', 'Market_Vol': 'High'}] = \
-    [0.60, 0.25, 0.10, 0.04, 0.01]
-
-
-
-# Example CPT for Stock Performance
-stock_cpt = bn.cpt('Stock_Perf')
-
-# Fill remaining with default values
-stock_cpt.fillWith([0.15, 0.20, 0.30, 0.25, 0.10])
-
-# Strong economy, low inflation, holding rates, low volatility
-stock_cpt[{'GDP_Trend': 'Strong', 'Inflation_Env': 'Low', 'Interest_Rate': 'Holding', 'Market_Vol': 'Low'}] = \
-    [0.01, 0.04, 0.10, 0.35, 0.50]
-
-# Recession, high inflation, hiking rates, high volatility
-stock_cpt[{'GDP_Trend': 'Recession', 'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'High'}] = \
-    [0.50, 0.30, 0.12, 0.06, 0.02]
-
-
-
-# Example CPT for Crypto Performance
-crypto_cpt = bn.cpt('Crypto_Perf')
-
-crypto_cpt.fillWith([0.20, 0.25, 0.30, 0.15, 0.10])
-
-# High volatility generally bad for crypto
-crypto_cpt[{'Inflation_Env': 'High', 'Interest_Rate': 'Hiking', 'Market_Vol': 'High'}] = \
-    [0.45, 0.30, 0.15, 0.08, 0.02]
-
-# Low volatility, cutting rates can be good for crypto
-crypto_cpt[{'Inflation_Env': 'Low', 'Interest_Rate': 'Cutting', 'Market_Vol': 'Low'}] = \
-    [0.05, 0.10, 0.20, 0.30, 0.35]
-
-
-# Portfolio Outcome CPT (simplified - would depend on investment choice in full model)
-po_cpt = bn.cpt('Portfolio_Out')
-# This is a simplified aggregation - in full decision network would be conditioned on choice
-po_cpt.fillWith([0.15, 0.20, 0.30, 0.25, 0.10])'''
-
-print("\nCPTs populated with example probabilities")
-print("\nNetwork ready for inference!")
-
-# Display network structure
-print("\n" + "="*60)
-print("NETWORK NODES:")
-print("="*60)
-for node in bn.names():
-    print(f"- {node}: {bn.variable(node).labels()}")
+# --- SCENARIO 1: STAGFLATION (Moderate Investor) ---
+# As described in your report [cite: 588]
+ie.eraseAllEvidence()
+ie.setEvidence({'GDP_Trend': 'Stagnant', 'Inflation_Env': 'High', 'Risk_Tol': 'Moderate'})
 
 print("\n" + "="*60)
-print("NETWORK ARCS (Causal Relationships):")
+print("DECISION ANALYSIS: SCENARIO 1 - STAGFLATION")
 print("="*60)
-for arc in bn.arcs():
-    parent = bn.variable(arc[0]).name()
-    child = bn.variable(arc[1]).name()
-    print(f"{parent} → {child}")
+print("\nScenario Evidence: Stagnant GDP, High Inflation")
+print("Investor Profile: Moderate")
 
-print("\nCalculating CPT for Portfolio_Out...")
+ie.makeInference()
+utilities_stagflation = ie.posteriorUtility('Invest_In')
 
-po_cpt = bn.cpt('Portfolio_Out')
+# -- A more efficient way to find the best action --
+labels = bn.variable('Invest_In').labels()
+values = utilities_stagflation.tolist()
+utility_map = dict(zip(labels, values))
+recommended_action_stagflation = max(utility_map, key=utility_map.get)
 
-# Define a scoring system for outcomes
-# Strong_Loss=-2, Minor_Loss=-1, Neutral=0, Minor_Gain=1, Strong_Gain=2
-scores = [-2, -1, 0, 1, 2]
-score_map = {label: score for label, score in zip(stock_perf.labels(), scores)}
+max_expected_utility_stagflation = ie.MEU()['mean']
 
-# Define portfolio weights (e.g., 60% stocks, 30% bonds, 10% crypto)
-weights = {'Stock_Perf': 0.60, 'Bond_Perf': 0.30, 'Crypto_Perf': 0.10}
 
-# Iterate through every possible combination of parent states
-for stock_label in stock_perf.labels():
-    for bond_label in bond_perf.labels():
-        for crypto_label in crypto_perf.labels():
-            # Calculate the weighted average score for this scenario
-            weighted_score = (score_map[stock_label] * weights['Stock_Perf'] +
-                              score_map[bond_label] * weights['Bond_Perf'] +
-                              score_map[crypto_label] * weights['Crypto_Perf'])
+print(f"\nRecommended Action: Invest in '{recommended_action_stagflation}'")
+print(f"Maximum Expected Utility (MEU): {max_expected_utility_stagflation:.4f}")
+print("\nExpected Utilities for all choices:\n", utilities_stagflation)
 
-            # Determine the most likely portfolio outcome based on the score
-            # This is a simple mapping. A more complex model could create a distribution.
-            if weighted_score > 1.25:
-                # Strong Gain
-                outcome_dist = [0.0, 0.0, 0.1, 0.3, 0.6]
-            elif weighted_score > 0.5:
-                # Minor Gain
-                outcome_dist = [0.0, 0.1, 0.3, 0.5, 0.1]
-            elif weighted_score > -0.5:
-                # Neutral
-                outcome_dist = [0.1, 0.2, 0.4, 0.2, 0.1]
-            elif weighted_score > -1.25:
-                # Minor Loss
-                outcome_dist = [0.1, 0.5, 0.3, 0.1, 0.0]
-            else:
-                # Strong Loss
-                outcome_dist = [0.6, 0.3, 0.1, 0.0, 0.0]
+# --- SCENARIO 2: GOLDILOCKS (Moderate Investor) ---
+# As described in your report [cite: 603]
+ie.eraseAllEvidence()
+ie.setEvidence({'GDP_Trend': 'Strong', 'Inflation_Env': 'Low', 'Risk_Tol': 'Moderate'})
 
-            # Set the probability distribution for this specific scenario
-            po_cpt[{'Stock_Perf': stock_label, 'Bond_Perf': bond_label, 'Crypto_Perf': crypto_label}] = outcome_dist
+print("\n" + "="*60)
+print("DECISION ANALYSIS: SCENARIO 2 - GOLDILOCKS")
+print("="*60)
+print("\nScenario Evidence: Strong GDP, Low Inflation")
+print("Investor Profile: Moderate")
 
-print("Portfolio_Out CPT populated.")
+ie.makeInference()
+utilities_goldilocks = ie.posteriorUtility('Invest_In')
+
+# -- A more efficient way to find the best action --
+labels = bn.variable('Invest_In').labels()
+values = utilities_goldilocks.tolist()
+utility_map = dict(zip(labels, values))
+recommended_action_goldilocks = max(utility_map, key=utility_map.get)
+
+max_expected_utility_goldilocks = ie.MEU()['mean']
+
+print(f"\nRecommended Action: Invest in '{recommended_action_goldilocks}'")
+print(f"Maximum Expected Utility (MEU): {max_expected_utility_goldilocks:.4f}")
+print("\nExpected Utilities for all choices:\n", utilities_goldilocks)
+
+# ===================================================================
+#                      4. VISUALIZE THE MODEL
+# ===================================================================
+
+print("\n" + "="*60)
+print("VISUALIZATIONS")
+print("="*60)
+
+# 1. Show network structure
+print("\nDisplaying network structure...")
+gnb.showInfluenceDiagram(bn, size="30")
+gumimage.export(bn,"test_output.png")
+
 
